@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pod recap dashboard</title><style>
+:root{color-scheme:light;--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink-2:#52514e;--muted:#898781;
+--grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10);--s1:#2a78d6;--s2:#eb6834;--track:#cde2fb;
+--warn:#fab219;--serious:#ec835a;--flag-bg:#fff6e0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;
+--ink:#f0efec;--ink-2:#c3c2b7;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;
+--track:#0d366b;--flag-bg:#2e2512}}
+:root[data-theme="dark"]{color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink-2:#c3c2b7;--grid:#2c2c2a;
+--axis:#383835;--border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;--track:#0d366b;--flag-bg:#2e2512}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:780px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:0 0 4px}
+.lede{color:var(--ink-2);margin:0 0 20px;font-size:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin:0 0 16px}
+.sub{color:var(--ink-2);font-size:13px;margin:0 0 14px}
+.track{position:relative;height:16px;border-left:1px solid var(--axis);border-right:1px solid var(--grid);
+background-image:linear-gradient(to right,var(--grid) 1px,transparent 1px);background-size:25% 100%}
+.fill{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;background:var(--s1)}
+.fill.s2{background:var(--s2)}
+.target{position:absolute;top:-5px;bottom:-5px;width:2px;margin-left:-1px;background:var(--ink-2)}
+.brow,.axis,.axis-top{display:grid;grid-template-columns:4.6rem 1fr 3rem;column-gap:10px;align-items:center}
+.brow{row-gap:3px;padding:8px 0;border-radius:6px}
+.brow.total{border-top:1px solid var(--grid);margin-top:4px;padding-top:12px}
+.name{font-weight:600}.val{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.meta,.adopt{grid-column:2/4;font-size:13px;color:var(--ink-2)}
+.adopt.flag{color:var(--ink);background:var(--flag-bg);border-radius:6px;padding:2px 6px;justify-self:start}
+.icon{width:14px;height:14px;vertical-align:-2px}
+.lab{position:relative;height:18px;font-size:12px;color:var(--ink-2)}
+.lab span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.tk{position:relative;height:16px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tk span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.axis{margin-top:6px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--grid);vertical-align:top}
+thead th{font-size:12px;color:var(--ink-2);font-weight:600}
+td{font-variant-numeric:tabular-nums}td small{color:var(--ink-2)}
+.num{font-weight:600}.split td.share{font-weight:600}
+.meter{display:block;height:6px;border-radius:3px;background:var(--track);margin-top:6px;overflow:hidden}
+.meter span{display:block;height:100%;background:var(--s1);border-radius:3px}
+.legend{display:flex;gap:14px;align-items:center;font-size:13px;color:var(--ink-2);margin:0 0 8px}
+.key{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:-8px}
+.key.s1{background:var(--s1)}.key.s2{background:var(--s2)}
+.axis-top.m,.axis.m{grid-template-columns:1fr 8rem}
+.mgroup{padding:6px 0}.mname{font-weight:600;font-size:14px;margin-bottom:4px}
+.mrow{display:grid;grid-template-columns:1fr 8rem;column-gap:10px;align-items:center;margin-bottom:2px;border-radius:4px}
+.mrow .track{height:12px}.mrow .target{top:-3px;bottom:-3px}
+.mval{font-size:13px;font-variant-numeric:tabular-nums}.mval.none{color:var(--muted)}
+.sparks{display:grid;grid-template-columns:1fr;gap:8px}
+@media (min-width:640px){.sparks{grid-template-columns:1fr 1fr}}
+.spark{margin:0}.spark figcaption{font-weight:600;font-size:14px}
+.spark svg{display:block;width:100%;max-width:420px;height:auto;overflow:visible}
+.spark .sel{fill:var(--s1);opacity:.08}.wk th.sel{color:var(--ink)}
+.spark .grid{stroke:var(--grid);stroke-width:1}.spark .base{stroke:var(--axis);stroke-width:1}
+.spark .tline{stroke:var(--ink-2);stroke-width:1}
+.spark .line{fill:none;stroke:var(--s1);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.spark .dot{fill:var(--s1);stroke:var(--surface);stroke-width:2}.spark .hit{fill:transparent}
+.spark text{font-size:11px;fill:var(--muted)}.spark .yl.t{fill:var(--ink-2);font-weight:600}
+.spark .xl{fill:var(--ink-2)}.spark .end{fill:var(--ink);font-weight:600;font-size:12px}
+details{margin-top:10px;font-size:14px}summary{cursor:pointer;color:var(--ink-2)}
+.scroll{overflow-x:auto}.wk td{white-space:nowrap}
+.alert{margin:0 0 8px}
+[data-v]{outline:none;cursor:default}
+.brow:hover,.brow:focus-visible,.mrow:hover,.mrow:focus-visible,td[data-v]:hover,td[data-v]:focus-visible{background:var(--page)}
+.pt:hover .dot,.pt:focus .dot{r:5.5;stroke:var(--ink)}
+#tip{position:fixed;z-index:9;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--border);
+border-radius:8px;padding:6px 10px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.18);max-width:260px}
+#tip strong{display:block;font-size:15px}#tip span{color:var(--ink-2)}
+.foot{color:var(--muted);font-size:12px}
+</style></head>
+<body><main>
+<h1>Recaps by pod</h1>
+<p class="lede">140 calls held, 2026-09-01 to 2026-09-24. A recap counts if posted within 60 min of call end.
+Target: 80% in every pod by 31 Oct. Built from <code>calls.csv</code> with <code>scripts/b1_metrics.py</code>.</p>
+
+<section class="card"><h2>1. Recap within 60 min, by pod</h2>
+<p class="sub">Share of calls held with a recap posted within 60 min of call end. Line: 80% target. </p>
+<div class="bars">
+<div class="axis-top"><span></span><span class="lab"><span style="left:80%">80% target</span></span><span></span></div>
+
+<div class="brow" tabindex="0" data-v="90%" data-l="North: 36 of 40 calls held">
+  <span class="name">North</span>
+  <span class="track"><span class="fill" style="width:90.0%"></span><span class="target" style="left:80%"></span></span>
+  <span class="val">90%</span>
+  <span class="meta">40 held · 38 recorded · 38 posted · 36 within 60 min</span>
+  <span class="adopt">adoption.csv: 90%, matches</span>
+</div>
+<div class="brow" tabindex="0" data-v="70%" data-l="East: 21 of 30 calls held">
+  <span class="name">East</span>
+  <span class="track"><span class="fill" style="width:70.0%"></span><span class="target" style="left:80%"></span></span>
+  <span class="val">70%</span>
+  <span class="meta">30 held · 28 recorded · 28 posted · 21 within 60 min</span>
+  <span class="adopt flag"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14.5H1z" fill="var(--warn)"/><path d="M8 6v4.2M8 12v.6" stroke="#0b0b0b" stroke-width="1.6" stroke-linecap="round"/></svg> <b>Differs:</b> adoption.csv says 75%; calls.csv gives 70%</span>
+</div>
+<div class="brow" tabindex="0" data-v="35%" data-l="South: 14 of 40 calls held">
+  <span class="name">South</span>
+  <span class="track"><span class="fill" style="width:35.0%"></span><span class="target" style="left:80%"></span></span>
+  <span class="val">35%</span>
+  <span class="meta">40 held · 36 recorded · 34 posted · 14 within 60 min</span>
+  <span class="adopt">adoption.csv: 35%, matches</span>
+</div>
+<div class="brow" tabindex="0" data-v="10%" data-l="West: 3 of 30 calls held">
+  <span class="name">West</span>
+  <span class="track"><span class="fill" style="width:10.0%"></span><span class="target" style="left:80%"></span></span>
+  <span class="val">10%</span>
+  <span class="meta">30 held · 4 recorded · 4 posted · 3 within 60 min</span>
+  <span class="adopt">adoption.csv: 10%, matches</span>
+</div>
+<div class="brow total" tabindex="0" data-v="53%" data-l="All pods: 74 of 140 calls held">
+  <span class="name">All pods</span>
+  <span class="track"><span class="fill" style="width:52.9%"></span><span class="target" style="left:80%"></span></span>
+  <span class="val">53%</span>
+  <span class="meta">140 held · 106 recorded · 104 posted · 74 within 60 min</span>
+  
+</div>
+<div class="axis"><span></span><span class="tk"><span style="left:0.0000%">0%</span><span style="left:25.0000%">25%</span><span style="left:50.0000%">50%</span><span style="left:75.0000%">75%</span><span style="left:100.0000%">100%</span></span><span></span></div>
+</div></section>
+
+<section class="card"><h2>2. Capture × speed</h2>
+<p class="sub">Capture = recorded ÷ held. Speed = within 60 min ÷ recorded. Their product is the share in section 1.</p>
+<table class="split"><thead><tr><th>Pod</th><th>Capture</th><th>× Speed</th><th>= Share</th></tr></thead>
+<tbody><tr><th>North</th><td tabindex="0" data-v="95%" data-l="North capture: 38/40"><span class="num">95%</span> <small>38/40</small><span class="meter"><span style="width:95.0%"></span></span></td><td tabindex="0" data-v="95%" data-l="North speed: 36/38"><span class="num">95%</span> <small>36/38</small><span class="meter"><span style="width:94.7%"></span></span></td><td class="share">90%</td></tr><tr><th>East</th><td tabindex="0" data-v="93%" data-l="East capture: 28/30"><span class="num">93%</span> <small>28/30</small><span class="meter"><span style="width:93.3%"></span></span></td><td tabindex="0" data-v="75%" data-l="East speed: 21/28"><span class="num">75%</span> <small>21/28</small><span class="meter"><span style="width:75.0%"></span></span></td><td class="share">70%</td></tr><tr><th>South</th><td tabindex="0" data-v="90%" data-l="South capture: 36/40"><span class="num">90%</span> <small>36/40</small><span class="meter"><span style="width:90.0%"></span></span></td><td tabindex="0" data-v="39%" data-l="South speed: 14/36"><span class="num">39%</span> <small>14/36</small><span class="meter"><span style="width:38.9%"></span></span></td><td class="share">35%</td></tr><tr><th>West</th><td tabindex="0" data-v="13%" data-l="West capture: 4/30"><span class="num">13%</span> <small>4/30</small><span class="meter"><span style="width:13.3%"></span></span></td><td tabindex="0" data-v="75%" data-l="West speed: 3/4"><span class="num">75%</span> <small>3/4</small><span class="meter"><span style="width:75.0%"></span></span></td><td class="share">10%</td></tr></tbody></table></section>
+
+<section class="card"><h2>3. Median minutes to post, agent vs AM</h2>
+<p class="sub">From call end to recap, over every posted recap. Line: the 60-min threshold.</p>
+<div class="legend"><span class="key s1"></span>Agent <span class="key s2"></span>AM</div>
+<div class="axis-top m"><span class="lab"><span style="left:66.7%">60 min</span></span><span></span></div>
+<div class="mgroup"><div class="mname">North</div>
+  <div class="mrow" tabindex="0" data-v="58 min (n=5)" data-l="North, median minutes to post, agent">
+    <span class="track" style="background-size:33.3333% 100%"><span class="fill s1" style="width:64.4%"></span><span class="target" style="left:66.7%"></span></span>
+    <span class="mval">58 min (n=5)</span>
+  </div>
+  <div class="mrow" tabindex="0" data-v="18 min (n=33)" data-l="North, median minutes to post, AM">
+    <span class="track" style="background-size:33.3333% 100%"><span class="fill s2" style="width:20.0%"></span><span class="target" style="left:66.7%"></span></span>
+    <span class="mval">18 min (n=33)</span>
+  </div></div><div class="mgroup"><div class="mname">East</div>
+  <div class="mrow" tabindex="0" data-v="59 min (n=16)" data-l="East, median minutes to post, agent">
+    <span class="track" style="background-size:33.3333% 100%"><span class="fill s1" style="width:65.6%"></span><span class="target" style="left:66.7%"></span></span>
+    <span class="mval">59 min (n=16)</span>
+  </div>
+  <div class="mrow" tabindex="0" data-v="18 min (n=12)" data-l="East, median minutes to post, AM">
+    <span class="track" style="background-size:33.3333% 100%"><span class="fill s2" style="width:20.6%"></span><span class="target" style="left:66.7%"></span></span>
+    <span class="mval">18 min (n=12)</span>
+  </div></div><div class="mgroup"><div class="mname">South</div>
+  <div class="mrow" tabindex="0" data-v="74 min (n=34)" data-l="South, median minutes to post, agent">
+    <span class="track" style="background-size:33.3333% 100%"><span class="fill s1" style="width:82.2%"></span><span class="target" style="left:66.7%"></span></span>
+    <span class="mval">74 min (n=34)</span>
+  </div>
+  <div class="mrow" tabindex="0" data-v="none posted" data-l="South, median minutes to post, AM">
+    <span class="track" style="background-size:33.3333% 100%"><span class="fill s2" style="width:0.0%"></span><span class="target" style="left:66.7%"></span></span>
+    <span class="mval none">none posted</span>
+  </div></div><div class="mgroup"><div class="mname">West</div>
+  <div class="mrow" tabindex="0" data-v="56 min (n=4)" data-l="West, median minutes to post, agent">
+    <span class="track" style="background-size:33.3333% 100%"><span class="fill s1" style="width:61.7%"></span><span class="target" style="left:66.7%"></span></span>
+    <span class="mval">56 min (n=4)</span>
+  </div>
+  <div class="mrow" tabindex="0" data-v="none posted" data-l="West, median minutes to post, AM">
+    <span class="track" style="background-size:33.3333% 100%"><span class="fill s2" style="width:0.0%"></span><span class="target" style="left:66.7%"></span></span>
+    <span class="mval none">none posted</span>
+  </div></div>
+<div class="axis m"><span class="tk"><span style="left:0.0000%">0</span><span style="left:33.3333%">30</span><span style="left:66.6667%">60</span><span style="left:100.0000%">90 min</span></span><span></span></div>
+</section>
+
+<section class="card"><h2>4. Weekly share, by pod</h2>
+<p class="sub">Recap within 60 min ÷ calls held, per Monday-start week, across the whole log (2026-09-01 to 2026-09-24). Line: 80% target.</p>
+<div class="sparks"><figure class="spark"><figcaption>North</figcaption><svg viewBox="0 0 320 146" role="img" aria-label="North weekly share: 1–6 Sep 90%, 7–13 Sep 89%, 14–20 Sep 83%, 21–24 Sep 100%"><line x1="40" x2="270" y1="118.0" y2="118.0" class="base"/><text x="34" y="121.5" class="yl" text-anchor="end">0%</text><line x1="40" x2="270" y1="66.0" y2="66.0" class="grid"/><text x="34" y="69.5" class="yl" text-anchor="end">50%</text><line x1="40" x2="270" y1="14.0" y2="14.0" class="grid"/><text x="34" y="17.5" class="yl" text-anchor="end">100%</text><line x1="40" x2="270" y1="34.8" y2="34.8" class="tline"/><text x="34" y="38.3" class="yl t" text-anchor="end">80%</text><path d="M40.0,24.4L116.7,25.6L193.3,31.3L270.0,14.0" class="line"/><text x="40.0" y="138" class="xl" text-anchor="middle">1–6 Sep</text><text x="116.7" y="138" class="xl" text-anchor="middle">7–13 Sep</text><text x="193.3" y="138" class="xl" text-anchor="middle">14–20 Sep</text><text x="270.0" y="138" class="xl" text-anchor="middle">21–24 Sep</text><g class="pt" tabindex="0" data-v="90%" data-l="North, 1–6 Sep: 9 of 10 calls held"><circle cx="40.0" cy="24.4" r="12" class="hit"/><circle cx="40.0" cy="24.4" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="89%" data-l="North, 7–13 Sep: 8 of 9 calls held"><circle cx="116.7" cy="25.6" r="12" class="hit"/><circle cx="116.7" cy="25.6" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="83%" data-l="North, 14–20 Sep: 10 of 12 calls held"><circle cx="193.3" cy="31.3" r="12" class="hit"/><circle cx="193.3" cy="31.3" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="100%" data-l="North, 21–24 Sep: 9 of 9 calls held"><circle cx="270.0" cy="14.0" r="12" class="hit"/><circle cx="270.0" cy="14.0" r="4" class="dot"/></g><text x="279.0" y="18.0" class="end">100%</text></svg></figure><figure class="spark"><figcaption>East</figcaption><svg viewBox="0 0 320 146" role="img" aria-label="East weekly share: 1–6 Sep 50%, 7–13 Sep 43%, 14–20 Sep 100%, 21–24 Sep 86%"><line x1="40" x2="270" y1="118.0" y2="118.0" class="base"/><text x="34" y="121.5" class="yl" text-anchor="end">0%</text><line x1="40" x2="270" y1="66.0" y2="66.0" class="grid"/><text x="34" y="69.5" class="yl" text-anchor="end">50%</text><line x1="40" x2="270" y1="14.0" y2="14.0" class="grid"/><text x="34" y="17.5" class="yl" text-anchor="end">100%</text><line x1="40" x2="270" y1="34.8" y2="34.8" class="tline"/><text x="34" y="38.3" class="yl t" text-anchor="end">80%</text><path d="M40.0,66.0L116.7,73.4L193.3,14.0L270.0,28.9" class="line"/><text x="40.0" y="138" class="xl" text-anchor="middle">1–6 Sep</text><text x="116.7" y="138" class="xl" text-anchor="middle">7–13 Sep</text><text x="193.3" y="138" class="xl" text-anchor="middle">14–20 Sep</text><text x="270.0" y="138" class="xl" text-anchor="middle">21–24 Sep</text><g class="pt" tabindex="0" data-v="50%" data-l="East, 1–6 Sep: 4 of 8 calls held"><circle cx="40.0" cy="66.0" r="12" class="hit"/><circle cx="40.0" cy="66.0" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="43%" data-l="East, 7–13 Sep: 3 of 7 calls held"><circle cx="116.7" cy="73.4" r="12" class="hit"/><circle cx="116.7" cy="73.4" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="100%" data-l="East, 14–20 Sep: 8 of 8 calls held"><circle cx="193.3" cy="14.0" r="12" class="hit"/><circle cx="193.3" cy="14.0" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="86%" data-l="East, 21–24 Sep: 6 of 7 calls held"><circle cx="270.0" cy="28.9" r="12" class="hit"/><circle cx="270.0" cy="28.9" r="4" class="dot"/></g><text x="279.0" y="32.9" class="end">86%</text></svg></figure><figure class="spark"><figcaption>South</figcaption><svg viewBox="0 0 320 146" role="img" aria-label="South weekly share: 1–6 Sep 20%, 7–13 Sep 50%, 14–20 Sep 33%, 21–24 Sep 40%"><line x1="40" x2="270" y1="118.0" y2="118.0" class="base"/><text x="34" y="121.5" class="yl" text-anchor="end">0%</text><line x1="40" x2="270" y1="66.0" y2="66.0" class="grid"/><text x="34" y="69.5" class="yl" text-anchor="end">50%</text><line x1="40" x2="270" y1="14.0" y2="14.0" class="grid"/><text x="34" y="17.5" class="yl" text-anchor="end">100%</text><line x1="40" x2="270" y1="34.8" y2="34.8" class="tline"/><text x="34" y="38.3" class="yl t" text-anchor="end">80%</text><path d="M40.0,97.2L116.7,66.0L193.3,83.3L270.0,76.4" class="line"/><text x="40.0" y="138" class="xl" text-anchor="middle">1–6 Sep</text><text x="116.7" y="138" class="xl" text-anchor="middle">7–13 Sep</text><text x="193.3" y="138" class="xl" text-anchor="middle">14–20 Sep</text><text x="270.0" y="138" class="xl" text-anchor="middle">21–24 Sep</text><g class="pt" tabindex="0" data-v="20%" data-l="South, 1–6 Sep: 2 of 10 calls held"><circle cx="40.0" cy="97.2" r="12" class="hit"/><circle cx="40.0" cy="97.2" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="50%" data-l="South, 7–13 Sep: 4 of 8 calls held"><circle cx="116.7" cy="66.0" r="12" class="hit"/><circle cx="116.7" cy="66.0" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="33%" data-l="South, 14–20 Sep: 4 of 12 calls held"><circle cx="193.3" cy="83.3" r="12" class="hit"/><circle cx="193.3" cy="83.3" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="40%" data-l="South, 21–24 Sep: 4 of 10 calls held"><circle cx="270.0" cy="76.4" r="12" class="hit"/><circle cx="270.0" cy="76.4" r="4" class="dot"/></g><text x="279.0" y="80.4" class="end">40%</text></svg></figure><figure class="spark"><figcaption>West</figcaption><svg viewBox="0 0 320 146" role="img" aria-label="West weekly share: 1–6 Sep 0%, 7–13 Sep 25%, 14–20 Sep 11%, 21–24 Sep 0%"><line x1="40" x2="270" y1="118.0" y2="118.0" class="base"/><text x="34" y="121.5" class="yl" text-anchor="end">0%</text><line x1="40" x2="270" y1="66.0" y2="66.0" class="grid"/><text x="34" y="69.5" class="yl" text-anchor="end">50%</text><line x1="40" x2="270" y1="14.0" y2="14.0" class="grid"/><text x="34" y="17.5" class="yl" text-anchor="end">100%</text><line x1="40" x2="270" y1="34.8" y2="34.8" class="tline"/><text x="34" y="38.3" class="yl t" text-anchor="end">80%</text><path d="M40.0,118.0L116.7,92.0L193.3,106.4L270.0,118.0" class="line"/><text x="40.0" y="138" class="xl" text-anchor="middle">1–6 Sep</text><text x="116.7" y="138" class="xl" text-anchor="middle">7–13 Sep</text><text x="193.3" y="138" class="xl" text-anchor="middle">14–20 Sep</text><text x="270.0" y="138" class="xl" text-anchor="middle">21–24 Sep</text><g class="pt" tabindex="0" data-v="0%" data-l="West, 1–6 Sep: 0 of 7 calls held"><circle cx="40.0" cy="118.0" r="12" class="hit"/><circle cx="40.0" cy="118.0" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="25%" data-l="West, 7–13 Sep: 2 of 8 calls held"><circle cx="116.7" cy="92.0" r="12" class="hit"/><circle cx="116.7" cy="92.0" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="11%" data-l="West, 14–20 Sep: 1 of 9 calls held"><circle cx="193.3" cy="106.4" r="12" class="hit"/><circle cx="193.3" cy="106.4" r="4" class="dot"/></g><g class="pt" tabindex="0" data-v="0%" data-l="West, 21–24 Sep: 0 of 6 calls held"><circle cx="270.0" cy="118.0" r="12" class="hit"/><circle cx="270.0" cy="118.0" r="4" class="dot"/></g><text x="279.0" y="122.0" class="end">0%</text></svg></figure></div>
+<details><summary>Table</summary><div class="scroll"><table class="wk"><thead><tr><th>Pod</th><th>1–6 Sep</th><th>7–13 Sep</th><th>14–20 Sep</th><th>21–24 Sep</th></tr></thead><tbody><tr><th>North</th><td>90% <small>9/10</small></td><td>89% <small>8/9</small></td><td>83% <small>10/12</small></td><td>100% <small>9/9</small></td></tr><tr><th>East</th><td>50% <small>4/8</small></td><td>43% <small>3/7</small></td><td>100% <small>8/8</small></td><td>86% <small>6/7</small></td></tr><tr><th>South</th><td>20% <small>2/10</small></td><td>50% <small>4/8</small></td><td>33% <small>4/12</small></td><td>40% <small>4/10</small></td></tr><tr><th>West</th><td>0% <small>0/7</small></td><td>25% <small>2/8</small></td><td>11% <small>1/9</small></td><td>0% <small>0/6</small></td></tr></tbody></table></div></details>
+</section>
+<section class="card"><h2>5. Alerts: recorded calls with no recap</h2><p class="alert"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14.5H1z" fill="var(--serious)"/><path d="M8 6v4.2M8 12v.6" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/></svg> <b>2 recorded calls with no recap</b></p><table class="alerts"><thead><tr><th>Call</th><th>Pod</th><th>Account</th><th>Date</th></tr></thead><tbody><tr><td>c117</td><td>South</td><td>kettle-and-crumb</td><td>2026-09-22</td></tr><tr><td>c140</td><td>South</td><td>kettle-and-crumb</td><td>2026-09-24</td></tr></tbody></table></section>
+<p class="foot">Regenerate: <code>python3 extra/pod-dashboard/dashboard.py [minutes] [--from YYYY-MM-DD --to YYYY-MM-DD]</code></p>
+</main><div id="tip" role="status" hidden></div><script>
+const tip=document.getElementById('tip');
+function show(e){const t=e.currentTarget,v=document.createElement('strong'),l=document.createElement('span');
+v.textContent=t.dataset.v;l.textContent=t.dataset.l;tip.replaceChildren(v,l);tip.hidden=false;
+let x,y;if(e.type==='focus'){const r=t.getBoundingClientRect();x=r.left+r.width/2;y=r.top}else{x=e.clientX;y=e.clientY}
+const w=tip.offsetWidth,h=tip.offsetHeight;tip.style.left=Math.min(Math.max(8,x-w/2),innerWidth-w-8)+'px';
+tip.style.top=(y-h-12<8?y+20:y-h-12)+'px'}
+function hide(){tip.hidden=true}
+document.querySelectorAll('[data-v]').forEach(el=>{el.addEventListener('pointermove',show);el.addEventListener('focus',show);
+el.addEventListener('pointerleave',hide);el.addEventListener('blur',hide)});
+</script></body></html>

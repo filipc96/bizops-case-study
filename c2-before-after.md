@@ -81,7 +81,7 @@ Line numbers refer to `after-recap.md`. Result: **all 6 problems fixed, 24 of 24
 
 ## 5. What a skill file can't fix
 
-These still fail after the last round. Details are in [`fde-ticket.md`](fde-ticket.md).
+These still fail after the last round. [`fde-ticket.md`](fde-ticket.md) asks engineering for five of them: speed, capture, cutting the private talk, a hard check before posting, and an alert when a recorded call gets no recap. The other two aren't engineering asks: a private route for held-back items needs a decision about who may see them, and the dashboard counting any post is for the dashboard's owner.
 
 - **Speed:** the agent posts 45–91 min after a call. Its median is 65 min, and only 29 of 59 agent recaps land within 60 min ([`calls.csv`](calls.csv)). South skips it in favour of their own notes ([`slack-thread.txt`](slack-thread.txt):4,7).
 - **Capture:** 34 of 140 calls (on WhatsApp or by phone) are never recorded, including 26 of West's 30, so the agent never sees them ([`NOW.md`](brain/NOW.md):16, [`calls.csv`](calls.csv)).
