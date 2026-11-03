@@ -7,7 +7,12 @@ The number: share of client calls with a recap posted within N minutes of call_e
 Usage:
     python3 scripts/b1_metrics.py              # 60-minute threshold
     python3 scripts/b1_metrics.py 15           # any other threshold, in minutes
+    python3 scripts/b1_metrics.py --from 2026-09-21 --to 2026-09-24   # one week (dates inclusive)
+    python3 scripts/b1_metrics.py --from 2026-09-24 --to 2026-09-24   # one day
     python3 scripts/b1_metrics.py --calls calls.csv --adoption adoption.csv
+
+--from / --to filter on the `date` column. The adoption.csv check only runs when the
+filter keeps every call, because the dashboard covers the whole log.
 
 Standard library only.
 """
@@ -163,22 +168,47 @@ def print_data_checks(rows):
         print(f"  {label}: {', '.join(hits) if hits else 'none'}")
 
 
+def iso_date(value):
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected YYYY-MM-DD, got {value!r}")
+    return value
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("minutes", nargs="?", type=float, default=60,
                     help="threshold in minutes after call_end (default 60, inclusive)")
+    ap.add_argument("--from", dest="date_from", type=iso_date, metavar="YYYY-MM-DD",
+                    help="first call date to include (inclusive)")
+    ap.add_argument("--to", dest="date_to", type=iso_date, metavar="YYYY-MM-DD",
+                    help="last call date to include (inclusive)")
     ap.add_argument("--calls", default=ROOT / "calls.csv", type=Path)
     ap.add_argument("--adoption", default=ROOT / "adoption.csv", type=Path)
     args = ap.parse_args()
+    if args.date_from and args.date_to and args.date_from > args.date_to:
+        ap.error(f"--from {args.date_from} is after --to {args.date_to}")
     minutes = int(args.minutes) if args.minutes.is_integer() else args.minutes
 
-    rows = load_calls(args.calls)
+    all_rows = load_calls(args.calls)
+    rows = [r for r in all_rows
+            if (not args.date_from or r["date"] >= args.date_from)
+            and (not args.date_to or r["date"] <= args.date_to)]
+    window = f"{args.date_from or 'start'} to {args.date_to or 'end'}"
+    if not rows:
+        print(f"No calls in calls.csv from {window}.")
+        return
     pods = by_pod(rows)
-    print(f"{len(rows)} calls, {min(r['date'] for r in rows)} to {max(r['date'] for r in rows)}")
+    print(f"{len(rows)} calls, {min(r['date'] for r in rows)} to {max(r['date'] for r in rows)}"
+          + (f" (filter: {window})" if len(rows) < len(all_rows) else ""))
     print_pod_table(pods, minutes)
     print_medians(pods)
     print_east_split(pods, minutes)
-    print_dashboard_check(pods, args.adoption)
+    if len(rows) == len(all_rows):
+        print_dashboard_check(pods, args.adoption)
+    else:
+        print("\n4. calls.csv vs adoption.csv: skipped, because the dashboard covers the whole log, not this filter")
     print_data_checks(rows)
 
 
