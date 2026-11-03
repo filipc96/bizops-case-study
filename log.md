@@ -1,6 +1,5 @@
-**Time:** ~ human hours · ~Y AI hours
-**Sessions:** <start>–<stop> · …
-**Skipped:** none / <list>
+**Time:** ~3 human hours · ~2 AI hours (two sessions often ran in parallel)
+**Skipped:** none
 
 **First instruction I gave the AI:**
 
