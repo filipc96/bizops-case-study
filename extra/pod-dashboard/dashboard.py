@@ -9,8 +9,8 @@ Usage:
 Each run rebuilds dashboard.html for the dates given (no dates = the whole log) with the
 same layout, and prints everything the page shows as text: first the per-pod table in
 b1_metrics.py's format (so the two can be diffed), then recorded calls with no recap, the
-gap to the 80% target, capture x speed, agent vs AM medians, weekly share and the
-adoption.csv comparison. Never edit the HTML by hand: this script is the only thing that writes it.
+gap to the 80% target, capture x speed, agent vs AM medians, weekly share, platforms and
+the adoption.csv comparison. Never edit the HTML by hand: this script is the only thing that writes it.
 
 Every count and share comes from scripts/b1_metrics.py (load_calls, summarise, by_pod),
 so this page and B1 can't disagree. The page is one self-contained HTML file: inline
@@ -20,6 +20,7 @@ Standard library only.
 import argparse
 import csv
 import html
+import math
 import statistics
 import sys
 from datetime import date, timedelta
@@ -34,6 +35,7 @@ from b1_metrics import (DASHBOARD_MINUTES, by_pod, fmt_median, iso_date,  # noqa
 
 TARGET = 0.80                           # INSTRUCTIONS.md:40, brain/NOW.md:10
 OUT = HERE / "dashboard.html"
+PLATFORMS = {"meet": "Meet", "whatsapp": "WhatsApp", "phone": "Phone", "other": "Other"}   # fixed order = fixed colour
 esc = html.escape
 
 
@@ -250,6 +252,96 @@ def section_weekly(order, all_rows, minutes, sel):
 </section>"""
 
 
+def plat(r):
+    return r["platform"].strip().lower() if r["platform"].strip().lower() in PLATFORMS else "other"
+
+
+def platform_keys(all_rows):
+    """Platforms in the whole log, in fixed order, so colours and layout don't change with the dates."""
+    seen = {plat(r) for r in all_rows}
+    return [k for k in PLATFORMS if k in seen]
+
+
+def by_platform(rows, keys):
+    out = {k: [] for k in keys}
+    for r in rows:
+        out[plat(r)].append(r)
+    return out
+
+
+def donut(parts, total):
+    """SVG donut: parts = [(key, count)]; 2px surface gaps between slices."""
+    cx = cy = 80
+    ro, ri = 72, 46
+    out, a = [], -math.pi / 2
+    live = [(k, n) for k, n in parts if n]
+    for k, n in live:
+        f = n / total
+        b = a + f * 2 * math.pi
+        label = f"{PLATFORMS[k]}: {n} of {total} calls held"
+        if len(live) == 1:          # one platform: a full ring
+            shape = (f'<circle cx="{cx}" cy="{cy}" r="{(ro + ri) / 2}" fill="none" stroke="var(--{k})" '
+                     f'stroke-width="{ro - ri}"/>')
+        else:
+            big = 1 if b - a > math.pi else 0
+            p = lambda r, t: f"{cx + r * math.cos(t):.2f},{cy + r * math.sin(t):.2f}"
+            shape = (f'<path d="M{p(ro, a)}A{ro},{ro} 0 {big} 1 {p(ro, b)}L{p(ri, b)}A{ri},{ri} 0 {big} 0 {p(ri, a)}Z" '
+                     f'fill="var(--{k})" class="slice"/>')
+        out.append(f'<g {tip(pct(f), label)}>{shape}</g>')
+        a = b
+    out.append(f'<text x="{cx}" y="{cy - 2}" class="dn" text-anchor="middle">{total}</text>'
+               f'<text x="{cx}" y="{cy + 15}" class="dl" text-anchor="middle">calls held</text>')
+    summary = ", ".join(f"{PLATFORMS[k]} {n}" for k, n in parts)
+    return f'<svg class="donut" viewBox="0 0 160 160" role="img" aria-label="Calls held by platform: {esc(summary)}">{"".join(out)}</svg>'
+
+
+def section_platforms(order, rows, keys, minutes):
+    total = len(rows)
+    groups = by_platform(rows, keys)
+    pstats = {k: summarise(groups[k], minutes) for k in keys}
+    legend = "".join(
+        f'<li {tip(pct(pstats[k]["held"] / total), f"{PLATFORMS[k]}: {pstats[k]["held"]} of {total} calls held")}>'
+        f'<span class="key" style="background:var(--{k})"></span><span class="pn">{PLATFORMS[k]}</span>'
+        f'<span class="pv">{pct(pstats[k]["held"] / total)}</span><span class="pc">{pstats[k]["held"]} calls</span></li>'
+        for k in keys)
+
+    mix, trs = "", ""
+    for pod in order:
+        n = len(PODS[pod])
+        counts = {k: sum(plat(r) == k for r in PODS[pod]) for k in keys}
+        segs = "".join(f'<span class="seg" style="width:{c / n:.4%};background:var(--{k})" '
+                       f'{tip(pct(c / n), f"{pod}: {c} of {n} calls on {PLATFORMS[k]}")}></span>'
+                       for k, c in counts.items() if c) if n else ""
+        meta = " · ".join(f"{PLATFORMS[k]} {c} ({pct(c / n)})" for k, c in counts.items() if c) if n else "no calls in these dates"
+        mix += (f'<div class="prow"><span class="name">{esc(pod)}</span><span class="stack">{segs}</span>'
+                f'<span class="meta">{meta}</span></div>')
+        trs += f"<tr><th>{esc(pod)}</th>" + "".join(f"<td>{counts[k]}</td>" for k in keys) + f"<td>{n}</td></tr>"
+    keyrow = "".join(f'<span class="key" style="background:var(--{k})"></span>{PLATFORMS[k]} ' for k in keys)
+    head = "".join(f"<th>{PLATFORMS[k]}</th>" for k in keys)
+
+    def cell(k, num, what):
+        held = pstats[k]["held"]
+        x = num / held if held else None
+        frac = f"{num}/{held}" if held else "0 held"
+        return (f'<td {tip(pct(x), f"{PLATFORMS[k]} {what}: {frac}")}><span class="num">{pct(x)}</span> <small>{frac}</small>'
+                f'<span class="meter"><span style="width:{width(x)}"></span></span></td>')
+    body = "".join(f'<tr><th><span class="key" style="background:var(--{k})"></span>{PLATFORMS[k]}</th>'
+                   f'{cell(k, pstats[k]["recorded"], "recorded")}{cell(k, pstats[k]["posted"], "recap posted")}'
+                   f'{cell(k, pstats[k]["within"], f"recap within {minutes} min")}</tr>' for k in keys)
+    return f"""
+<section class="card"><h2>5. Platforms</h2>
+<p class="sub">The platform each call was held on, which pods use which, and how many calls on each platform were recorded and recapped.</p>
+<div class="pie"><figure>{donut([(k, pstats[k]["held"]) for k in keys], total)}</figure><ul class="plist">{legend}</ul></div>
+<h3>Platform mix, by pod</h3>
+<div class="legend">{keyrow}</div>
+<div class="mix">{mix}</div>
+<details><summary>Table</summary><div class="scroll"><table class="pmix"><thead><tr><th>Pod</th>{head}<th>Held</th></tr></thead><tbody>{trs}</tbody></table></div></details>
+<h3>Recorded and recapped, by platform</h3>
+<p class="sub">Each as a share of the calls held on that platform.</p>
+<table class="split plat"><thead><tr><th>Platform</th><th>Recorded</th><th>Recap posted</th><th>Within {minutes} min</th></tr></thead>
+<tbody>{body}</tbody></table></section>"""
+
+
 def section_alerts(rows):
     hits = sorted((r for r in rows if r["recorded"] and r["minutes"] is None), key=lambda r: (r["date"], r["call_id"]))
     if not hits:
@@ -259,18 +351,20 @@ def section_alerts(rows):
                       for r in hits)
         body = (f'<p class="alert">{icon("serious")} <b>{len(hits)} recorded call{"s" if len(hits) != 1 else ""} with no recap</b></p>'
                 f'<table class="alerts"><thead><tr><th>Call</th><th>Pod</th><th>Account</th><th>Date</th></tr></thead><tbody>{trs}</tbody></table>')
-    return f'<section class="card"><h2>5. Alerts: recorded calls with no recap</h2>{body}</section>'
+    return f'<section class="card"><h2>6. Alerts: recorded calls with no recap</h2>{body}</section>'
 
 
 CSS = """
 :root{color-scheme:light;--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink-2:#52514e;--muted:#898781;
 --grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10);--s1:#2a78d6;--s2:#eb6834;--track:#cde2fb;
---warn:#fab219;--serious:#ec835a;--flag-bg:#fff6e0}
+--warn:#fab219;--serious:#ec835a;--flag-bg:#fff6e0;
+--meet:#2a78d6;--whatsapp:#eb6834;--phone:#1baf7a;--other:#898781}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;
 --ink:#f0efec;--ink-2:#c3c2b7;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;
---track:#0d366b;--flag-bg:#2e2512}}
+--track:#0d366b;--flag-bg:#2e2512;--meet:#3987e5;--whatsapp:#d95926;--phone:#199e70}}
 :root[data-theme="dark"]{color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink-2:#c3c2b7;--grid:#2c2c2a;
---axis:#383835;--border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;--track:#0d366b;--flag-bg:#2e2512}
+--axis:#383835;--border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;--track:#0d366b;--flag-bg:#2e2512;
+--meet:#3987e5;--whatsapp:#d95926;--phone:#199e70}
 *{box-sizing:border-box}
 body{margin:0;background:var(--page);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:780px;margin:0 auto;padding:24px 16px 48px}
@@ -324,8 +418,23 @@ td{font-variant-numeric:tabular-nums}td small{color:var(--ink-2)}
 details{margin-top:10px;font-size:14px}summary{cursor:pointer;color:var(--ink-2)}
 .scroll{overflow-x:auto}.wk td{white-space:nowrap}
 .alert{margin:0 0 8px}
+h3{font-size:14px;margin:18px 0 6px}
+.pie{display:flex;flex-wrap:wrap;align-items:center;gap:8px 28px}.pie figure{margin:0}
+.donut{display:block;width:160px;height:160px}.donut .slice{stroke:var(--surface);stroke-width:2;stroke-linejoin:round}
+.donut g:hover .slice,.donut g:focus .slice{stroke:var(--ink)}
+.donut .dn{font-size:24px;font-weight:600;fill:var(--ink)}.donut .dl{font-size:11px;fill:var(--ink-2)}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.plist li{display:grid;grid-template-columns:12px 6rem 3rem auto;column-gap:10px;align-items:center;padding:2px 6px;border-radius:6px}
+.plist .key{margin-right:0}.plat th .key{margin-right:8px;vertical-align:-1px}
+.pn{font-weight:600}.pv{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}.pc{color:var(--ink-2);font-size:13px}
+.prow{display:grid;grid-template-columns:4.6rem 1fr;column-gap:10px;row-gap:3px;align-items:center;padding:6px 0}
+.prow .meta{grid-column:2}
+.stack{display:flex;gap:2px;height:16px;border-left:1px solid var(--axis)}
+.seg{display:block;height:100%}.seg:last-child{border-radius:0 4px 4px 0}
+.seg:hover,.seg:focus-visible{outline:2px solid var(--ink);outline-offset:-1px}
+.pmix td,.pmix th{text-align:right}.pmix th:first-child{text-align:left}
 [data-v]{outline:none;cursor:default}
-.brow:hover,.brow:focus-visible,.mrow:hover,.mrow:focus-visible,td[data-v]:hover,td[data-v]:focus-visible{background:var(--page)}
+.plist li:hover,.plist li:focus-visible,.brow:hover,.brow:focus-visible,.mrow:hover,.mrow:focus-visible,td[data-v]:hover,td[data-v]:focus-visible{background:var(--page)}
 .pt:hover .dot,.pt:focus .dot{r:5.5;stroke:var(--ink)}
 #tip{position:fixed;z-index:9;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--border);
 border-radius:8px;padding:6px 10px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.18);max-width:260px}
@@ -377,6 +486,20 @@ def print_summary(order, stats, rows, all_rows, adoption, minutes, full_log, fil
     for pod in order:
         print(f"  {pod:<7}" + " · ".join(f"{lab}{'*' if o else ''} {pct(s['share'])} ({s['within']}/{s['held']})"
                                          for (lab, s), o in zip(by[pod], on)))
+    keys = platform_keys(all_rows)
+    groups = by_platform(rows, keys)
+    print("\nCalls held by platform: " + " · ".join(
+        f"{PLATFORMS[k]} {len(groups[k])} ({pct(len(groups[k]) / len(rows))})" for k in keys))
+    print("Platform mix by pod (calls held):")
+    for pod in order:
+        n = len(PODS[pod])
+        counts = [(k, sum(plat(r) == k for r in PODS[pod])) for k in keys]
+        print(f"  {pod:<7}" + (" · ".join(f"{PLATFORMS[k]} {c} ({pct(c / n)})" for k, c in counts if c) or "no calls"))
+    print("Recorded and recapped, by platform (share of calls held on it):")
+    for k in keys:
+        ps = summarise(groups[k], minutes)
+        f = lambda x: f"{x}/{ps['held']} = {pct(x / ps['held'])}" if ps["held"] else "n/a (0 held)"
+        print(f"  {PLATFORMS[k]:<9}recorded {f(ps['recorded']):<16} posted {f(ps['posted']):<16} within {minutes} min {f(ps['within'])}")
     if not full_log:
         print("\nadoption.csv: whole log only, not compared for these dates")
     else:
@@ -424,6 +547,7 @@ Target: {TARGET:.0%} in every pod by 31 Oct. Built from <code>calls.csv</code> w
 {section_split(order, stats, minutes)}
 {section_medians(order, minutes)}
 {section_weekly(order, all_rows, minutes, None if full_log else (first, last))}
+{section_platforms(order, rows, platform_keys(all_rows), minutes)}
 {section_alerts(rows)}
 <p class="foot">Regenerate: <code>python3 extra/pod-dashboard/dashboard.py [minutes] [--from YYYY-MM-DD --to YYYY-MM-DD]</code></p>
 </main><div id="tip" role="status" hidden></div><script>{JS}</script></body></html>

@@ -12,7 +12,7 @@ Arguments, in order: from date, to date, threshold in minutes (optional, default
 
 ## Steps
 1. **Dates.** Use YYYY-MM-DD as given. If a date is written another way ("21 Sep", "last week"), read it against `brain/NOW.md` (now = the week of 21 Sep 2026), not the system clock, and say how you read it in the commentary's first bullet. One date only: from = to. From after to: stop and ask.
-2. **Run.** From the repo root: `python3 extra/pod-dashboard/dashboard.py [minutes] --from FROM --to TO` (no `--from`/`--to` for the whole log). It prints everything on the page as text: the per-pod table, recorded calls with no recap, on-time recaps still needed for 80%, capture × speed, agent vs AM medians, weekly share and the `adoption.csv` comparison.
+2. **Run.** From the repo root: `python3 extra/pod-dashboard/dashboard.py [minutes] --from FROM --to TO` (no `--from`/`--to` for the whole log). It prints everything on the page as text: the per-pod table, recorded calls with no recap, on-time recaps still needed for 80%, capture × speed, agent vs AM medians, weekly share, platforms (calls by platform, each pod's mix, recorded/recapped by platform) and the `adoption.csv` comparison.
 3. **Check.** Run this with the same arguments; no output means the tables match:
    `diff <(python3 extra/pod-dashboard/dashboard.py ARGS | sed -n '/^pod /,/^All /p;/^All /q') <(python3 scripts/b1_metrics.py ARGS | sed -n '/^pod /,/^All /p;/^All /q')`
    Any difference: stop and report it.
@@ -20,6 +20,7 @@ Arguments, in order: from date, to date, threshold in minutes (optional, default
    - Headline: the dates, the number of calls, and each pod's share against 80%, with the on-time recaps it still needs.
    - What holds each pod below target back: capture (calls not recorded) or speed (recaps late), and agent vs AM speed from the medians.
    - The trend in the weekly share; for a date range, how the starred weeks compare with the rest. Flag weeks with few calls instead of reading much into them.
+   - Platforms: which platform each pod uses most, and which platforms go unrecorded or without a recap.
    - Recorded calls with no recap, by call id.
    - Whole log only: any pod where `adoption.csv` differs from `calls.csv`.
    Talk about pods, not people: no opinions about anyone (`brain/SANITIZER.md`). Mark an inference as one. Cite any file you add context from (e.g. `brain/NOW.md`).

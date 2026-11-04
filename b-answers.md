@@ -28,6 +28,6 @@ This split shows which part holds each pod back. West can't pass 13% even with a
 
 **The cause is the agent's speed, with nobody posting faster.** The agent posted all 34 South recaps, at a median of 74 minutes; 20 missed the hour. No AM posts. Marcus and Tomas send their own notes first, and Marcus says he'd use the bot if it posted within 10–15 minutes (`slack-thread.txt`). East shows the fix works: once AMs started posting on 15 Sep, East went from 50% to 93% (`calls.csv`, `brain/NOW.md`).
 
-**Why not West (10%)?** Its gap is capture, not speed. 26 of its 30 calls are unrecorded WhatsApp calls, so even an instant agent leaves West at 13%. That needs a capture tool, which Lena is already looking for (`brain/NOW.md`).
+**Why not West (10%)?** Its gap is capture: 26 of its 30 calls are unrecorded WhatsApp calls, so even an instant agent leaves it at 13%. Its clients prefer WhatsApp (`brain/NOW.md`), so moving them to Meet is an ask, not a fix we control (Theo did switch once). Its next step is the same paste as South's, which needs no recording; a capture tool, which Lena is looking for, comes later.
 
 **Priya's proposal: no.** Emailed summaries aren't logged in `calls.csv`, where the number is measured, and nobody checks they have owners and due dates. Counting them makes South look done while hiding the agent's latency. Instead, post that summary to the client's channel within the hour, which counts honestly.

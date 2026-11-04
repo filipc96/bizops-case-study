@@ -1,4 +1,4 @@
-**Time:** ~3 human hours · ~2 AI hours (two sessions often ran in parallel)
+**Time:** ~3 human hours · ~2 AI hours (3–4 sessions often ran in parallel)
 **Skipped:** none
 
 **First instruction I gave the AI:**

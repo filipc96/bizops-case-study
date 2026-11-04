@@ -4,6 +4,7 @@ My answers to Ironside's Biz Ops case study: recap adoption and the recap agent 
 
 **In short**
 - **South's gap is speed.** The recap agent posts its recaps a median of 74 minutes after the call, and its account managers don't post their own. East went from 50% to 93% once its account managers posted.
+- **West's gap is capture.** 26 of its 30 calls are on WhatsApp, which is never recorded, so the agent never sees them. Its clients prefer WhatsApp, so moving them to Meet is an ask, not a fix Biz Ops controls.
 - **The dashboard overstates East:** 75% shown, 70% real.
 - **The recap agent posted a private message for the client to read.** Its skill is rewritten and tested on three calls, and a checker now tests recaps in code.
 
